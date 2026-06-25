@@ -1,0 +1,4 @@
+node_modules/
+whitelist.json
+config.js
+.env

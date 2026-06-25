@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Void Manager</title>
+    <meta name="description" content="Void Manager - Enregistrez et recherchez les refus rapidement.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Animated background blobs -->
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <img class="logo-img" src="logo.png" alt="Void Manager Logo" width="48" height="48">
+                <div>
+                    <h1>Void Manager</h1>
+                    <p class="subtitle">Gestion des refus Discord</p>
+                </div>
+            </div>
+            <div class="stats-bar">
+                <div class="stat">
+                    <span class="stat-number" id="totalEntries">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" id="todayEntries">0</span>
+                    <span class="stat-label">Aujourd'hui</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- User Bar -->
+        <div class="user-bar" id="userBar">
+            <div class="user-info">
+                <img class="user-avatar" id="userAvatar" src="" alt="Avatar">
+                <div class="user-details">
+                    <span class="user-name" id="userName">Chargement...</span>
+                    <span class="user-tag" id="userTag">Connecté via Discord</span>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn" id="logoutBtn" title="Se déconnecter">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Déconnexion</span>
+            </a>
+        </div>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <input type="text" id="searchInput" class="search-input" placeholder="Rechercher par ID, pseudo ou raison..." autocomplete="off">
+                <button id="clearSearch" class="clear-search-btn" title="Effacer la recherche">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="search-results-info" id="searchResultsInfo"></div>
+        </section>
+
+        <!-- Add Entry Form -->
+        <section class="form-section">
+            <button class="toggle-form-btn" id="toggleFormBtn">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <span>Ajouter un refus</span>
+            </button>
+            <div class="form-container" id="formContainer">
+                <form id="refusalForm" autocomplete="off">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="discordId">
+                                <svg viewBox="0 0 24 24" fill="none"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                ID Discord
+                            </label>
+                            <input type="text" id="discordId" placeholder="Ex: 123456789012345678" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="pseudo">
+                                <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                Pseudo
+                            </label>
+                            <input type="text" id="pseudo" placeholder="Ex: Username#1234" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reason">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Raison du refus
+                        </label>
+                        <textarea id="reason" rows="3" placeholder="Décrivez la raison du refus..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Enregistrer le refus</span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Whitelist Access Section -->
+        <section class="whitelist-section">
+            <button class="toggle-whitelist-btn" id="toggleWhitelistBtn">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Gérer les accès</span>
+            </button>
+            <div class="whitelist-container" id="whitelistContainer">
+                <div class="whitelist-inner">
+                    <form id="whitelistForm" autocomplete="off">
+                        <h3>Autoriser un utilisateur</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="whitelistDiscordId">ID Discord</label>
+                                <input type="text" id="whitelistDiscordId" placeholder="Ex: 198237912837192837" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="whitelistUsername">Nom / Rôle (Mémo)</label>
+                                <input type="text" id="whitelistUsername" placeholder="Ex: Jean (Modérateur)" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="submit-btn whitelist-submit-btn">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span>Ajouter aux autorisations</span>
+                        </button>
+                    </form>
+                    
+                    <div class="whitelist-list-wrapper">
+                        <h3>Membres autorisés</h3>
+                        <div class="whitelist-list" id="whitelistList">
+                            <!-- Whitelisted users will be listed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Entries List -->
+        <section class="entries-section">
+            <div class="entries-header">
+                <h2>
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Liste des refus
+                </h2>
+                <div class="entries-actions">
+                    <button class="sort-btn" id="sortBtn" title="Trier">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Récents</span>
+                    </button>
+                    <button class="export-btn" id="exportBtn" title="Exporter en JSON">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Exporter</span>
+                    </button>
+                    <button class="import-btn" id="importBtn" title="Importer un JSON">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V10m0 0l3 3m-3-3l-3 3m2-12H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-4.414-4.414A1 1 0 0013.586 3H12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Importer</span>
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display:none">
+                </div>
+            </div>
+            <div class="entries-list" id="entriesList">
+                <!-- Entries rendered here -->
+            </div>
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Aucun refus enregistré</h3>
+                <p>Commencez par ajouter un refus en cliquant sur le bouton ci-dessus.</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <div class="modal-icon">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3>Confirmer la suppression</h3>
+            <p>Êtes-vous sûr de vouloir supprimer ce refus ? Cette action est irréversible.</p>
+            <div class="modal-actions">
+                <button class="modal-cancel" id="modalCancel">Annuler</button>
+                <button class="modal-confirm" id="modalConfirm">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
