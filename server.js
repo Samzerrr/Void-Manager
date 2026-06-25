@@ -8,7 +8,21 @@ const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
 const fs = require('fs');
-const config = require('./config');
+
+let config;
+try {
+    config = require('./config');
+} catch (e) {
+    // Fallback pour Render ou autres hébergeurs cloud où config.js est ignoré
+    config = {
+        CLIENT_ID: process.env.CLIENT_ID || '',
+        CLIENT_SECRET: process.env.CLIENT_SECRET || '',
+        PORT: process.env.PORT || 3000,
+        CALLBACK_URL: process.env.CALLBACK_URL || '',
+        SESSION_SECRET: process.env.SESSION_SECRET || 'render-fallback-session-secret-key',
+        ALLOWED_USER_IDS: process.env.ALLOWED_USER_IDS ? process.env.ALLOWED_USER_IDS.split(',') : []
+    };
+}
 
 const app = express();
 
