@@ -1,13 +1,12 @@
 // ==========================================
 // Refus Manager - Application Logic
-// Uses localStorage for data persistence
+// Uses MySQL API for data persistence
 // ==========================================
 
 (function () {
     'use strict';
 
     // ---- Constants ----
-    const STORAGE_KEY = 'refusManager_entries';
     const SORT_KEY = 'refusManager_sortOrder';
 
     // ---- DOM Elements ----
@@ -52,18 +51,86 @@
     let deletingId = null;
     let searchDebounce = null;
 
-    // ---- LocalStorage Helpers ----
-    function loadEntries() {
+    // ---- API Helpers ----
+    async function apiGet(url) {
+        const res = await fetch(url);
+        if (!res.ok) {
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Erreur ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function apiPost(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Erreur ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function apiPut(url, body) {
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Erreur ${res.status}`);
+        }
+        return res.json();
+    }
+
+    async function apiDelete(url) {
+        const res = await fetch(url, { method: 'DELETE' });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Erreur ${res.status}`);
+        }
+        return res.json();
+    }
+
+    // ---- Load Entries from API ----
+    async function loadEntries(query = '') {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            entries = raw ? JSON.parse(raw) : [];
-        } catch {
-            entries = [];
+            const params = new URLSearchParams();
+            if (query) params.set('q', query);
+            params.set('sort', sortOrder);
+            entries = await apiGet(`/api/refus?${params}`);
+            renderEntries(query);
+            updateStats();
+        } catch (err) {
+            console.error('Error loading entries:', err);
+            showToast('Erreur de chargement des données', 'error');
         }
     }
 
-    function saveEntries() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    // ---- Update Stats from API ----
+    async function updateStats() {
+        try {
+            const stats = await apiGet('/api/refus/stats');
+            dom.totalEntries.textContent = stats.total;
+            dom.todayEntries.textContent = stats.today;
+
+            // Animate number change
+            [dom.totalEntries, dom.todayEntries].forEach(el => {
+                el.style.transform = 'scale(1.3)';
+                el.style.transition = 'transform 0.3s ease';
+                setTimeout(() => { el.style.transform = 'scale(1)'; }, 300);
+            });
+        } catch (err) {
+            console.error('Error loading stats:', err);
+        }
     }
 
     function loadSortOrder() {
@@ -91,27 +158,6 @@
             toast.classList.add('toast-out');
             toast.addEventListener('animationend', () => toast.remove());
         }, 3000);
-    }
-
-    // ---- Stats ----
-    function updateStats() {
-        dom.totalEntries.textContent = entries.length;
-
-        const today = new Date().toDateString();
-        const todayCount = entries.filter(e => new Date(e.createdAt).toDateString() === today).length;
-        dom.todayEntries.textContent = todayCount;
-
-        // Animate number change
-        [dom.totalEntries, dom.todayEntries].forEach(el => {
-            el.style.transform = 'scale(1.3)';
-            el.style.transition = 'transform 0.3s ease';
-            setTimeout(() => { el.style.transform = 'scale(1)'; }, 300);
-        });
-    }
-
-    // ---- Generate Unique ID ----
-    function generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     }
 
     // ---- Format Date (Memoized) ----
@@ -170,14 +216,8 @@
     function renderEntries(query = '') {
         const q = query.trim().toLowerCase();
 
-        let filtered = entries;
-        if (q) {
-            filtered = entries.filter(e =>
-                e.discordId.toLowerCase().includes(q) ||
-                e.pseudo.toLowerCase().includes(q) ||
-                e.reason.toLowerCase().includes(q)
-            );
-        }
+        // Entries are already filtered and sorted by the API
+        const filtered = entries;
 
         // Precompile regex once per render instead of compiling it inside the loop
         let highlightRegex = null;
@@ -185,18 +225,6 @@
             const queryEscaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             highlightRegex = new RegExp(`(${queryEscaped})`, 'gi');
         }
-
-        // Sort using pre-cached timestamps to avoid O(N log N) Date instantiation overhead
-        const timestamps = new Map();
-        filtered.forEach(e => {
-            timestamps.set(e.id, new Date(e.createdAt).getTime());
-        });
-
-        filtered.sort((a, b) => {
-            const timeA = timestamps.get(a.id);
-            const timeB = timestamps.get(b.id);
-            return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
-        });
 
         // Update search results info
         if (q) {
@@ -244,15 +272,13 @@
                         </button>
                     </div>
                 </div>
-                <div class="entry-reason">${highlightText(entry.reason, q)}</div>
+                <div class="entry-reason">${highlightText(entry.reason, highlightRegex)}</div>
                 <div class="entry-date">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     ${formatDate(entry.createdAt)}
                 </div>
             </div>
         `).join('');
-
-        updateStats();
     }
 
     // ---- Toggle Form ----
@@ -281,7 +307,7 @@
     }
 
     // ---- Add / Edit Entry ----
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
         e.preventDefault();
 
         const discordId = dom.discordId.value.trim();
@@ -293,37 +319,28 @@
             return;
         }
 
-        if (editingId) {
-            // Edit existing
-            const idx = entries.findIndex(e => e.id === editingId);
-            if (idx !== -1) {
-                entries[idx].discordId = discordId;
-                entries[idx].pseudo = pseudo;
-                entries[idx].reason = reason;
-                entries[idx].updatedAt = new Date().toISOString();
+        try {
+            if (editingId) {
+                // Edit existing via API
+                await apiPut(`/api/refus/${editingId}`, { discordId, pseudo, reason });
+                showToast('Refus modifié avec succès !', 'success');
+            } else {
+                // Add new via API
+                await apiPost('/api/refus', { discordId, pseudo, reason });
+                showToast('Refus enregistré avec succès !', 'success');
             }
-            showToast('Refus modifié avec succès !', 'success');
-        } else {
-            // Add new
-            entries.push({
-                id: generateId(),
-                discordId,
-                pseudo,
-                reason,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-            showToast('Refus enregistré avec succès !', 'success');
-        }
 
-        saveEntries();
-        renderEntries(dom.searchInput.value);
-        toggleForm(false);
+            // Reload entries from server
+            await loadEntries(dom.searchInput.value);
+            toggleForm(false);
+        } catch (err) {
+            showToast(err.message || 'Erreur lors de l\'enregistrement', 'error');
+        }
     }
 
     // ---- Edit Entry ----
     function startEdit(id) {
-        const entry = entries.find(e => e.id === id);
+        const entry = entries.find(e => e.id == id);
         if (!entry) return;
 
         editingId = id;
@@ -344,15 +361,19 @@
         dom.deleteModal.classList.add('active');
     }
 
-    function executeDelete() {
+    async function executeDelete() {
         if (!deletingId) return;
-        entries = entries.filter(e => e.id !== deletingId);
-        saveEntries();
-        renderEntries(dom.searchInput.value);
-        updateStats();
-        dom.deleteModal.classList.remove('active');
-        deletingId = null;
-        showToast('Refus supprimé.', 'info');
+        try {
+            await apiDelete(`/api/refus/${deletingId}`);
+            dom.deleteModal.classList.remove('active');
+            deletingId = null;
+            showToast('Refus supprimé.', 'info');
+            await loadEntries(dom.searchInput.value);
+        } catch (err) {
+            showToast(err.message || 'Erreur lors de la suppression', 'error');
+            dom.deleteModal.classList.remove('active');
+            deletingId = null;
+        }
     }
 
     function cancelDelete() {
@@ -381,25 +402,30 @@
         sortOrder = sortOrder === 'newest' ? 'oldest' : 'newest';
         saveSortOrder();
         dom.sortBtn.querySelector('span').textContent = sortOrder === 'newest' ? 'Récents' : 'Anciens';
-        renderEntries(dom.searchInput.value);
+        loadEntries(dom.searchInput.value);
     }
 
     // ---- Export ----
-    function exportData() {
-        if (entries.length === 0) {
-            showToast('Aucune donnée à exporter.', 'error');
-            return;
-        }
+    async function exportData() {
+        try {
+            const data = await apiGet('/api/refus/export');
+            if (data.length === 0) {
+                showToast('Aucune donnée à exporter.', 'error');
+                return;
+            }
 
-        const data = JSON.stringify(entries, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `refus_export_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast(`${entries.length} refus exporté${entries.length > 1 ? 's' : ''} !`, 'success');
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `refus_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast(`${data.length} refus exporté${data.length > 1 ? 's' : ''} !`, 'success');
+        } catch (err) {
+            showToast('Erreur lors de l\'exportation', 'error');
+        }
     }
 
     // ---- Import ----
@@ -408,7 +434,7 @@
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = function (evt) {
+        reader.onload = async function (evt) {
             try {
                 const imported = JSON.parse(evt.target.result);
                 if (!Array.isArray(imported)) throw new Error('Format invalide');
@@ -420,28 +446,14 @@
 
                 if (!valid) throw new Error('Données incomplètes');
 
-                // Merge - add missing IDs and dates
-                const processed = imported.map(item => ({
-                    id: item.id || generateId(),
-                    discordId: item.discordId,
-                    pseudo: item.pseudo,
-                    reason: item.reason,
-                    createdAt: item.createdAt || new Date().toISOString(),
-                    updatedAt: item.updatedAt || new Date().toISOString(),
-                }));
+                // Send to API for import
+                const result = await apiPost('/api/refus/import', { entries: imported });
+                showToast(`${result.imported} refus importé${result.imported > 1 ? 's' : ''} !`, 'success');
 
-                // Avoid duplicates by ID
-                const existingIds = new Set(entries.map(e => e.id));
-                const newEntries = processed.filter(e => !existingIds.has(e.id));
-
-                entries = [...entries, ...newEntries];
-                saveEntries();
-                renderEntries(dom.searchInput.value);
-                updateStats();
-
-                showToast(`${newEntries.length} refus importé${newEntries.length > 1 ? 's' : ''} !`, 'success');
+                // Reload entries
+                await loadEntries(dom.searchInput.value);
             } catch (err) {
-                showToast('Erreur lors de l\'importation : fichier invalide.', 'error');
+                showToast('Erreur lors de l\'importation : ' + (err.message || 'fichier invalide.'), 'error');
             }
         };
         reader.readAsText(file);
@@ -457,14 +469,14 @@
         dom.clearSearch.classList.toggle('visible', q.length > 0);
 
         searchDebounce = setTimeout(() => {
-            renderEntries(q);
-        }, 150); // Quick debounce for snappy feel
+            loadEntries(q);
+        }, 300); // Debounce for API calls
     }
 
     function clearSearch() {
         dom.searchInput.value = '';
         dom.clearSearch.classList.remove('visible');
-        renderEntries();
+        loadEntries();
     }
 
     // ---- Event Delegation for Entry Actions ----
@@ -509,7 +521,6 @@
         }
     }
 
-    // ---- Init ----
     // ---- Load User Info ----
     function loadUserInfo() {
         fetch('/api/me')
@@ -638,15 +649,14 @@
         });
     }
 
-    function init() {
-        loadEntries();
+    async function init() {
         loadSortOrder();
         loadUserInfo();
 
         dom.sortBtn.querySelector('span').textContent = sortOrder === 'newest' ? 'Récents' : 'Anciens';
 
-        renderEntries();
-        updateStats();
+        // Load entries from MySQL API
+        await loadEntries();
 
         // Event listeners
         dom.toggleFormBtn.addEventListener('click', () => toggleForm());

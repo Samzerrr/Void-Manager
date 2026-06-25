@@ -8,6 +8,7 @@ const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
 const fs = require('fs');
+const db = require('./database');
 
 let config;
 try {
@@ -20,7 +21,12 @@ try {
         PORT: process.env.PORT || 3000,
         CALLBACK_URL: process.env.CALLBACK_URL || '',
         SESSION_SECRET: process.env.SESSION_SECRET || 'render-fallback-session-secret-key',
-        ALLOWED_USER_IDS: process.env.ALLOWED_USER_IDS ? process.env.ALLOWED_USER_IDS.split(',') : []
+        ALLOWED_USER_IDS: process.env.ALLOWED_USER_IDS ? process.env.ALLOWED_USER_IDS.split(',') : [],
+        DB_HOST: process.env.DB_HOST || 'localhost',
+        DB_USER: process.env.DB_USER || 'root',
+        DB_PASSWORD: process.env.DB_PASSWORD || '',
+        DB_NAME: process.env.DB_NAME || 'refus_manager',
+        DB_PORT: process.env.DB_PORT || 3306,
     };
 }
 
@@ -301,6 +307,130 @@ app.get('/logout', (req, res) => {
     });
 });
 
+// ========================================
+// API: Refus CRUD (MySQL)
+// ========================================
+
+// GET /api/refus — List all refus (optional ?q= search query, ?sort= newest|oldest)
+app.get('/api/refus', requireAuth, async (req, res) => {
+    try {
+        const query = req.query.q || '';
+        const sort = req.query.sort || 'newest';
+        const rows = await db.getAllRefus(query, sort);
+        // Map snake_case to camelCase for frontend compatibility
+        const entries = rows.map(r => ({
+            id: r.id,
+            discordId: r.discord_id,
+            pseudo: r.pseudo,
+            reason: r.reason,
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+        }));
+        res.json(entries);
+    } catch (err) {
+        console.error('GET /api/refus error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// GET /api/refus/stats — Get total + today count
+app.get('/api/refus/stats', requireAuth, async (req, res) => {
+    try {
+        const stats = await db.getStats();
+        res.json(stats);
+    } catch (err) {
+        console.error('GET /api/refus/stats error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// GET /api/refus/export — Export all refus as JSON
+app.get('/api/refus/export', requireAuth, async (req, res) => {
+    try {
+        const data = await db.exportRefus();
+        res.json(data);
+    } catch (err) {
+        console.error('GET /api/refus/export error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// POST /api/refus — Add a new refus
+app.post('/api/refus', requireAuth, async (req, res) => {
+    try {
+        const { discordId, pseudo, reason } = req.body;
+        if (!discordId || !pseudo || !reason) {
+            return res.status(400).json({ error: 'Tous les champs sont requis' });
+        }
+        const entry = await db.addRefus(discordId, pseudo, reason);
+        res.json({
+            id: entry.id,
+            discordId: entry.discord_id,
+            pseudo: entry.pseudo,
+            reason: entry.reason,
+            createdAt: entry.created_at,
+            updatedAt: entry.updated_at,
+        });
+    } catch (err) {
+        console.error('POST /api/refus error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// PUT /api/refus/:id — Update a refus
+app.put('/api/refus/:id', requireAuth, async (req, res) => {
+    try {
+        const { discordId, pseudo, reason } = req.body;
+        if (!discordId || !pseudo || !reason) {
+            return res.status(400).json({ error: 'Tous les champs sont requis' });
+        }
+        const entry = await db.updateRefus(req.params.id, discordId, pseudo, reason);
+        if (!entry) {
+            return res.status(404).json({ error: 'Refus introuvable' });
+        }
+        res.json({
+            id: entry.id,
+            discordId: entry.discord_id,
+            pseudo: entry.pseudo,
+            reason: entry.reason,
+            createdAt: entry.created_at,
+            updatedAt: entry.updated_at,
+        });
+    } catch (err) {
+        console.error('PUT /api/refus error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// DELETE /api/refus/:id — Delete a refus
+app.delete('/api/refus/:id', requireAuth, async (req, res) => {
+    try {
+        const deleted = await db.deleteRefus(req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: 'Refus introuvable' });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('DELETE /api/refus error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
+// POST /api/refus/import — Import multiple refus at once
+app.post('/api/refus/import', requireAuth, async (req, res) => {
+    try {
+        const { entries } = req.body;
+        if (!Array.isArray(entries)) {
+            return res.status(400).json({ error: 'Format invalide' });
+        }
+        const imported = await db.importRefus(entries);
+        res.json({ imported });
+    } catch (err) {
+        console.error('POST /api/refus/import error:', err.message);
+        res.status(500).json({ error: 'Erreur serveur' });
+    }
+});
+
 // ---- Protected static files ----
 app.use('/', requireAuth, express.static(path.join(__dirname, 'public')));
 
@@ -309,20 +439,32 @@ app.get('*', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ---- Start server ----
-app.listen(config.PORT, () => {
-    console.log('');
-    console.log('  ╔══════════════════════════════════════════╗');
-    console.log('  ║         🛡️  Void Manager Server          ║');
-    console.log('  ╠══════════════════════════════════════════╣');
-    console.log(`  ║  🌐  http://localhost:${config.PORT}               ║`);
-    console.log('  ║  📋  Discord OAuth2 activé               ║');
-    console.log(`  ║  🔐  ${config.ALLOWED_USER_IDS.length} utilisateur(s) autorisé(s)        ║`);
-    console.log('  ╚══════════════════════════════════════════╝');
-    console.log('');
+// ---- Start server (init DB first) ----
+async function startServer() {
+    try {
+        // Initialize MySQL database
+        await db.initDatabase(config);
 
-    if (config.CLIENT_ID === 'TON_CLIENT_ID_ICI') {
-        console.log('  ⚠️  ATTENTION: Configure tes identifiants Discord dans config.js !');
-        console.log('');
+        app.listen(config.PORT, () => {
+            console.log('');
+            console.log('  ╔══════════════════════════════════════════╗');
+            console.log('  ║         🛡️  Void Manager Server          ║');
+            console.log('  ╠══════════════════════════════════════════╣');
+            console.log(`  ║  🌐  http://localhost:${config.PORT}               ║`);
+            console.log('  ║  📋  Discord OAuth2 activé               ║');
+            console.log('  ║  🗄️   MySQL connecté                     ║');
+            console.log('  ╚══════════════════════════════════════════╝');
+            console.log('');
+
+            if (config.CLIENT_ID === 'TON_CLIENT_ID_ICI') {
+                console.log('  ⚠️  ATTENTION: Configure tes identifiants Discord dans config.js !');
+                console.log('');
+            }
+        });
+    } catch (err) {
+        console.error('❌ Impossible de démarrer le serveur:', err.message);
+        process.exit(1);
     }
-});
+}
+
+startServer();

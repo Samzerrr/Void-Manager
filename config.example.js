@@ -20,4 +20,11 @@ module.exports = {
 
     // ---- Session ----
     SESSION_SECRET: 'une-cle-secrete-aleatoire-ici',
+
+    // ---- MySQL Database ----
+    DB_HOST: 'mysql-voimanager.alwaysdata.net',
+    DB_USER: 'voimanager',
+    DB_PASSWORD: 'TON_MOT_DE_PASSE_MYSQL',
+    DB_NAME: 'voimanager_refus',
+    DB_PORT: 3306,
 };
